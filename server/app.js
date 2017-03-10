@@ -2,9 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const multer = require('multer');
+const cors = require('cors');
+const axios = require('axios');
 const parse = require('@sole/kindle-clippings-parser').parse;
 
 const app = express();
+
+const DOUBAN_API = 'https://api.douban.com/v2/book/';
+
+app.use(cors());
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -16,6 +22,10 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+const emptyObject = (obj) => {
+  return JSON.stringify(obj).length <= 2;
+};
+
 const manageClip = (v) => {
   let title = v.title;
   let i = 0;
@@ -25,7 +35,13 @@ const manageClip = (v) => {
     }
   }
   const author = title.slice(i).split(/\(|\)/)[1];
-  const name = title.slice(0, i);
+  let titleTmp = title.slice(0, i);
+  titleTmp = titleTmp.replace('《', '');
+  titleTmp = titleTmp.replace('》', '');
+  const firstLeftA = titleTmp.indexOf('(') === -1 ? 9999999999 : titleTmp.indexOf('(');
+  const firstLeftB = titleTmp.indexOf('（') === -1 ? 9999999999 : titleTmp.indexOf('（');
+  const firstLeft = firstLeftA < firstLeftB ? firstLeftA : firstLeftB;
+  const name = titleTmp.slice(0, firstLeft).trim();
   // console.log(v.highlights[0].metadata);
   const marks = v.highlights.map(r => {
     const position = r.metadata.split('|')[0].split('- ')[1];
@@ -37,18 +53,65 @@ const manageClip = (v) => {
     };
   });
 
+  const detail = {
+    cover: 'https://img3.doubanio.com/f/shire/5522dd1f5b742d1e1394a17f44d590646b63871d/pics/book-default-medium.gif',
+    title,
+    author,
+  };
+
   return {
     title: name,
     author,
     marks,
+    detail,
     // highlights: v.highlights,
   };
 }
 
-app.all('/upload', function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "X-Requested-With");
-  next();
+const findAuthor = (author, authors) => {
+  return authors.some(au => {
+    return au.indexOf(author) !== -1;
+  });
+};
+
+const doBook = (book, q, author) => {
+  console.log(JSON.stringify(book));
+  if (emptyObject(book)) {
+    book.title = q;
+    book.author = author;
+  } else {
+    book.author = book.author.join(', ');
+  }
+
+  return book;
+};
+
+app.get('/search', (req, res) => {
+  const q = req.query.q;
+  const author = req.query.author;
+  axios.get(`${DOUBAN_API}search`, {
+    params: {
+      q: q,
+    }
+  }).then(results => {
+    const books = results.data.books;
+    let book = {};
+    for(i = 0; i < books.length; i++) {
+      const b = books[i];
+      if(findAuthor(author, b.author)) {
+        book = b;
+        break;
+      }
+    }
+    if(emptyObject(book) && books[0]) {
+      book = books[0];
+    }
+    book = doBook(book, q, author);
+
+    res.send(book);
+  }).catch(err => {
+    console.error(err);
+  });
 });
 
 app.post('/upload', upload.single('logo'), (req, res) => {

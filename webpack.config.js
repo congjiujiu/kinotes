@@ -7,11 +7,10 @@ module.exports = {
         loader: 'vue',
       },
       {
-        // edit this for additional asset file types
-        test: /.*\.(gif|png|jpe?g|svg)$/i,
+        test: /\.(jpe?g|png|gif|svg)$/i,
         loaders: [
-          'url?limit=5000&hash=sha512&digest=hex&name=[name].[hash].[ext]',
-          'image-webpack?{progressive:true, optimizationLevel: 7, interlaced: false, pngquant:{quality: "65-90", speed: 4}}',
+          'file?hash=sha512&digest=hex&name=[hash].[ext]',
+          'image-webpack?bypassOnDebug&optimizationLevel=7&interlaced=false',
         ],
       },
     ],

@@ -4,7 +4,7 @@
       <a href="javascript;" class="a-upload">
         <div class="info">
           <p>{{ infoMessage }}</p>
-          <p @click="submitForm" class="submit" v-if="filename">确认</p>
+          <p @click="submitForm" class="submit" v-if="state.filename">确认</p>
         </div>
         <input type="file" name="logo" @change="fileSelected"></input>
       </a>
@@ -13,46 +13,29 @@
 </template>
 
 <script>
-import api from '../services/api';
-
 export default {
   data() {
     return {
-      uploadPath: 'http://localhost:3090/upload',
-      uploadRes: '',
-      filename: '',
+      state: this.$store.state,
     };
   },
   methods: {
     fileSelected(e) {
-      const filename = e.target.value.split('\\');
-      const fLength = filename.length;
-      this.filename = filename[fLength - 1];
+      const file = e.target.value.split('\\');
+      const fLength = file.length;
+      const filename = file[fLength - 1];
+      this.$store.commit('addFile', { filename });
     },
     submitForm(e) {
       e.preventDefault();
       const form = document.getElementById('fileForm'); // eslint-disable-line
       const formData = new FormData(form); // eslint-disable-line
-      api.post({
-        url: 'upload',
-        data: formData,
-      }).then((res) => {
-        console.log(this);
-        if (res.status === 200) {
-          this.uploadRes = res.statusText;
-        }
-      });
-    },
-    handleSuccess(file, fileList) {
-      console.log(file, fileList);
-    },
-    handleError(file) {
-      console.log(file);
+      this.$store.dispatch('uploadFile', { formData });
     },
   },
   computed: {
     infoMessage() {
-      return this.filename || '点击上传文件';
+      return this.state.filename || '点击上传文件';
     },
   },
 };
